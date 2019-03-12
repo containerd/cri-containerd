@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -679,18 +678,9 @@ func (c *criService) addOCIBindMounts(g *generator, mounts []*runtime.Mount, mou
 	for _, mount := range mounts {
 		dst := mount.GetContainerPath()
 		src := mount.GetHostPath()
-		// Create the host path if it doesn't exist.
-		// TODO(random-liu): Add CRI validation test for this case.
 		if _, err := c.os.Stat(src); err != nil {
-			if !os.IsNotExist(err) {
-				return errors.Wrapf(err, "failed to stat %q", src)
-			}
-			if err := c.os.MkdirAll(src, 0755); err != nil {
-				return errors.Wrapf(err, "failed to mkdir %q", src)
-			}
+			return errors.Wrapf(err, "failed to stat %q", src)
 		}
-		// TODO(random-liu): Add cri-containerd integration test or cri validation test
-		// for this.
 		src, err := c.os.ResolveSymbolicLink(src)
 		if err != nil {
 			return errors.Wrapf(err, "failed to resolve symlink %q", src)
