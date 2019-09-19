@@ -40,8 +40,4 @@ const (
 	// 2) Cleaning up the logs when the pod is deleted.
 	// NOTE: Kubelet is not responsible for rotating the logs.
 	SandboxLogDir = "io.kubernetes.cri.sandbox-log-directory"
-
-	// UntrustedWorkload is the sandbox annotation for untrusted workload. Untrusted
-	// workload can only run on dedicated runtime for untrusted workload.
-	UntrustedWorkload = "io.kubernetes.cri.untrusted-workload"
 )

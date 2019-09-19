@@ -90,16 +90,6 @@ version = 2
     # default_runtime_name is the default runtime name to use.
     default_runtime_name = "runc"
 
-    # 'plugins."io.containerd.grpc.v1.cri".containerd.default_runtime' is the runtime to use in containerd.
-    # DEPRECATED: use `default_runtime_name` and `plugins."io.containerd.grpc.v1.cri".runtimes` instead.
-    # Remove in containerd 1.4.
-    [plugins."io.containerd.grpc.v1.cri".containerd.default_runtime]
-
-    # 'plugins."io.containerd.grpc.v1.cri".containerd.untrusted_workload_runtime' is a runtime to run untrusted workloads on it.
-    # DEPRECATED: use `untrusted` runtime in `plugins."io.containerd.grpc.v1.cri".runtimes` instead.
-    # Remove in containerd 1.4.
-    [plugins."io.containerd.grpc.v1.cri".containerd.untrusted_workload_runtime]
-
     # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes' is a map from CRI RuntimeHandler strings, which specify types
     # of runtime configurations, to the matching configurations.
     # In this example, 'runc' is the RuntimeHandler string to match.
@@ -172,7 +162,7 @@ version = 2
     # file will be loaded. If you want to load multiple CNI plugin config files
     # set max_conf_num to the number desired. Setting max_config_num to 0 is
     # interpreted as no limit is desired and will result in all CNI plugin
-    # config files being loaded from the CNI config directory. 
+    # config files being loaded from the CNI config directory.
     max_conf_num = 1
 
     # conf_template is the file path of golang template used to generate
@@ -200,13 +190,6 @@ The recommended way to run untrusted workload is to use
 [`RuntimeClass`](https://kubernetes.io/docs/concepts/containers/runtime-class/) api
 introduced in Kubernetes 1.12 to select RuntimeHandlers configured to run
 untrusted workload in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes`.
-
-However, if you are using the legacy `io.kubernetes.cri.untrusted-workload`pod annotation
-to request a pod be run using a runtime for untrusted workloads, the RuntimeHandler
-`plugins."io.containerd.grpc.v1.cri"cri.containerd.runtimes.untrusted` must be defined first.
-When the annotation `io.kubernetes.cri.untrusted-workload` is set to `true` the `untrusted`
-runtime will be used. For example, see
-[Create an untrusted pod using Kata Containers](https://github.com/kata-containers/documentation/blob/master/how-to/how-to-use-k8s-with-cri-containerd-and-kata.md#create-an-untrusted-pod-using-kata-containers).
 
 ## Deprecation
 The config options of the CRI plugin follow the [Kubernetes deprecation

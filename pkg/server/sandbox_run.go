@@ -35,7 +35,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 
-	"github.com/containerd/cri/pkg/annotations"
 	criconfig "github.com/containerd/cri/pkg/config"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
 	ctrdutil "github.com/containerd/cri/pkg/containerd/util"
@@ -436,49 +435,8 @@ func selectPodIP(ipConfigs []*cni.IPConfig) string {
 	return ipConfigs[0].IP.String()
 }
 
-// untrustedWorkload returns true if the sandbox contains untrusted workload.
-func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
-	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
-}
-
-// hostAccessingSandbox returns true if the sandbox configuration
-// requires additional host access for the sandbox.
-func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
-	securityContext := config.GetLinux().GetSecurityContext()
-
-	namespaceOptions := securityContext.GetNamespaceOptions()
-	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
-		return true
-	}
-
-	return false
-}
-
 // getSandboxRuntime returns the runtime configuration for sandbox.
-// If the sandbox contains untrusted workload, runtime for untrusted workload will be returned,
-// or else default runtime will be returned.
 func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtimeHandler string) (criconfig.Runtime, error) {
-	if untrustedWorkload(config) {
-		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
-		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
-			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
-		}
-
-		//  If the untrusted workload is requesting access to the host/node, this request will fail.
-		//
-		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
-		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
-		// is a supported option, granting the workload to access the entire guest VM instead of host.
-		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
-		if hostAccessingSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
-		}
-
-		runtimeHandler = criconfig.RuntimeUntrusted
-	}
-
 	if runtimeHandler == "" {
 		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
 	}

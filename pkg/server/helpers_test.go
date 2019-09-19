@@ -187,7 +187,6 @@ func TestLocalResolve(t *testing.T) {
 
 func TestGenerateRuntimeOptions(t *testing.T) {
 	nilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"
@@ -199,7 +198,6 @@ systemd_cgroup = true
   runtime_type = "` + plugin.RuntimeRuncV2 + `"
 `
 	nonNilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"
@@ -244,12 +242,10 @@ systemd_cgroup = true
 			c:               nilOptsConfig,
 			expectedOptions: nil,
 		},
-		"when options is nil, should use legacy fields for legacy runtime": {
-			r: nilOptsConfig.Runtimes["legacy"],
-			c: nilOptsConfig,
-			expectedOptions: &runctypes.RuncOptions{
-				SystemdCgroup: true,
-			},
+		"when options is nil, should return nil option for legacy runtime": {
+			r:               nilOptsConfig.Runtimes["legacy"],
+			c:               nilOptsConfig,
+			expectedOptions: nil,
 		},
 		"when options is not nil, should be able to decode for io.containerd.runc.v1": {
 			r: nonNilOptsConfig.Runtimes["runc"],

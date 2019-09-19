@@ -299,15 +299,7 @@ func parseImageReferences(refs []string) ([]string, []string) {
 // generateRuntimeOptions generates runtime options from cri plugin config.
 func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
 	if r.Options == nil {
-		if r.Type != plugin.RuntimeLinuxV1 {
-			return nil, nil
-		}
-		// This is a legacy config, generate runctypes.RuncOptions.
-		return &runctypes.RuncOptions{
-			Runtime:       r.Engine,
-			RuntimeRoot:   r.Root,
-			SystemdCgroup: c.SystemdCgroup,
-		}, nil
+		return nil, nil
 	}
 	options := getRuntimeOptionsType(r.Type)
 	if err := toml.PrimitiveDecode(*r.Options, options); err != nil {
