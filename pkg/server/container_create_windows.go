@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/cri/pkg/annotations"
 	"github.com/containerd/cri/pkg/config"
 	customopts "github.com/containerd/cri/pkg/containerd/opts"
+	"github.com/pkg/errors"
 )
 
 // No container mounts for windows.
@@ -84,6 +85,15 @@ func (c *criService) containerSpec(id string, sandboxID string, sandboxPid uint3
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		ociRuntime.ContainerAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	ociHooksProfile := c.config.DefaultOCIHooks
+	hooks, err := c.generateOCIHooks(ociHooksProfile)
+	if err != nil { // TODO (mikebrow): clean up prototype
+		return nil, errors.Wrapf(err, "failed to generate OCI hooks %+v", ociHooksProfile)
+	}
+	if hooks != nil {
+		specOpts = append(specOpts, customopts.WithHooks(hooks))
 	}
 
 	specOpts = append(specOpts,

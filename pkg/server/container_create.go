@@ -17,6 +17,8 @@
 package server
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"path/filepath"
 	"time"
 
@@ -293,4 +295,20 @@ func runtimeSpec(id string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 		return nil, err
 	}
 	return spec, nil
+}
+
+// generateOCIHooks generates a runtimespec.Hooks struct from json in the passed in filepath.
+func (c *criService) generateOCIHooks(profile string) (*runtimespec.Hooks, error) {
+	if profile == "" {
+		return nil, nil
+	}
+	hooks := &runtimespec.Hooks{}
+	f, err := ioutil.ReadFile(profile)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(f, hooks); err != nil {
+		return nil, err
+	}
+	return hooks, nil
 }

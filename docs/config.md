@@ -78,6 +78,12 @@ version = 2
   # when using containerd with Kubernetes <=1.11.
   disable_proc_mount = false
 
+  # default_oci_hooks is the filepath to an OCI runtime spec Hooks struct in json.
+  # see details and example:
+  #    https://github.com/opencontainers/runtime-spec/blob/master/config.md#posix-platform-hooks
+  # ** Note: Overridden if set by CRI
+  default_oci_hooks = ""
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
