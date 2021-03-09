@@ -175,6 +175,22 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
+	securityContext := config.GetLinux().GetSecurityContext()
+
+	var snapshotterOption containerd.NewContainerOpts
+	switch securityContext.GetNamespaceOptions().GetUser() {
+	case runtime.NamespaceMode_CONTAINER:
+		return nil, errors.New("unsupported user namespace mode: CONTAINER")
+	case runtime.NamespaceMode_NODE:
+		snapshotterOption = customopts.WithNewSnapshot(id, containerdImage)
+	case runtime.NamespaceMode_POD:
+		snapshotterOption = customopts.WithRemappedSnapshot(id, containerdImage,
+			c.config.NodeWideUIDMapping.HostID-c.config.NodeWideUIDMapping.ContainerID,
+			c.config.NodeWideGIDMapping.HostID-c.config.NodeWideGIDMapping.ContainerID)
+	default:
+		return nil, errors.Wrapf(err, "invalid user namespace option %d for sandbox %q", securityContext.GetNamespaceOptions().GetUser(), id)
+	}
+
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.config.ContainerdConfig.Snapshotter),
@@ -183,7 +199,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(id, containerdImage),
+		snapshotterOption,
 	}
 
 	if len(volumeMounts) > 0 {
@@ -220,7 +236,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}()
 
 	var specOpts []oci.SpecOpts
-	securityContext := config.GetLinux().GetSecurityContext()
 	// Set container username. This could only be done by containerd, because it needs
 	// access to the container rootfs. Pass user name to containerd, and let it overwrite
 	// the spec for us.
@@ -437,6 +452,23 @@ func (c *criService) generateContainerSpec(id string, sandboxID string, sandboxP
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
 	)
+
+	switch securityContext.GetNamespaceOptions().GetUser() {
+	case runtime.NamespaceMode_NODE:
+		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
+	case runtime.NamespaceMode_POD:
+		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: customopts.GetUserNamespace(sandboxPid)}))
+		// When re-vendoring vendor/github.com/containerd/containerd/oci/spec_opts.go,
+		// the following line would need to be updated to:
+		// specOpts = append(specOpts, oci.WithUserNamespace(uidMap, gidMap))
+		// See:
+		// https://github.com/containerd/containerd/commit/51a6813c06030ae2b3fcf9ec068e4b39cd2d1e69
+		specOpts = append(specOpts, oci.WithUserNamespace(
+			c.config.NodeWideUIDMapping.ContainerID,
+			c.config.NodeWideUIDMapping.HostID,
+			c.config.NodeWideUIDMapping.Size,
+		))
+	}
 
 	return runtimeSpec(id, specOpts...)
 }

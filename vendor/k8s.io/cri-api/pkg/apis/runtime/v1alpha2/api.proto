@@ -107,6 +107,9 @@ service RuntimeService {
 
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    //  GetRuntimeConfigInfo returns the configuration details of the runtime.
+    rpc GetRuntimeConfigInfo(GetRuntimeConfigInfoRequest) returns (GetRuntimeConfigInfoResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -201,7 +204,7 @@ message Mount {
 }
 
 // A NamespaceMode describes the intended namespace configuration for each
-// of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
+// of the namespaces (Network, PID, IPC, User) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
 enum NamespaceMode {
     // A POD namespace is common to all containers in a pod.
@@ -233,6 +236,11 @@ message NamespaceOption {
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // User namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
+    // NODE is the default value. Kubelet will set it to POD if pod spec indicates to use user-namespace remapping
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode user = 4;
 }
 
 // Int64Value is the wrapper of int64.
@@ -1159,6 +1167,39 @@ message StatusResponse {
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+}
+
+// LinuxIDMapping represents a single user namespace mapping in Linux.
+message LinuxIDMapping {
+   // container_id is the starting id for the mapping inside the container.
+   uint32 container_id = 1;
+   // host_id is the starting id for the mapping on the host.
+   uint32 host_id = 2;
+   // size is the length of the mapping.
+   uint32 size = 3;
+}
+
+// LinuxUserNamespaceConfig represents runtime's user-namespace configuration on a linux host.
+message LinuxUserNamespaceConfig {
+   // uid_mappings is an array of user id mappings.
+   repeated LinuxIDMapping uid_mappings = 1;
+   // gid_mappings is an array of group id mappings.
+   repeated LinuxIDMapping gid_mappings = 2;
+}
+
+// ActiveRuntimeConfig contains the configuration details from the runtime.
+message ActiveRuntimeConfig {
+    // LinuxUserNamespaceConfig represents runtime's user-namespace configuration on a linux host.
+    LinuxUserNamespaceConfig user_namespace_config = 1;
+}
+
+// GetRuntimeConfigInfoRequest is the message sent for requesting runtime configuration details.
+message GetRuntimeConfigInfoRequest {}
+
+// GetRuntimeConfigInfoResponse is the response message from runtime that includes configuration details
+message GetRuntimeConfigInfoResponse {
+    // GetRuntimeConfig are the configuration details from the runtime.
+    ActiveRuntimeConfig runtime_config = 1;
 }
 
 message ImageFsInfoRequest {}

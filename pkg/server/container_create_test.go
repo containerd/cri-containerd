@@ -985,6 +985,46 @@ func TestPidNamespace(t *testing.T) {
 	}
 }
 
+func TestUserNamespace(t *testing.T) {
+	testID := "test-id"
+	sandboxPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+	for desc, test := range map[string]struct {
+		userNS          runtime.NamespaceMode
+		expected        runtimespec.LinuxNamespace
+		expectedMissing bool
+	}{
+		"node namespace mode": {
+			userNS: runtime.NamespaceMode_NODE,
+			expected: runtimespec.LinuxNamespace{
+				Type: runtimespec.UserNamespace,
+				Path: opts.GetUserNamespace(sandboxPid),
+			},
+			expectedMissing: true,
+		},
+		"pod namespace mode": {
+			userNS: runtime.NamespaceMode_POD,
+			expected: runtimespec.LinuxNamespace{
+				Type: runtimespec.UserNamespace,
+				Path: opts.GetUserNamespace(sandboxPid),
+			},
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{User: test.userNS}
+		spec, err := c.generateContainerSpec(testID, testSandboxID, sandboxPid, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		require.NoError(t, err)
+		if test.expectedMissing {
+			assert.NotContains(t, spec.Linux.Namespaces, test.expected)
+		} else {
+			assert.Contains(t, spec.Linux.Namespaces, test.expected)
+		}
+	}
+}
+
 func TestNoDefaultRunMount(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)

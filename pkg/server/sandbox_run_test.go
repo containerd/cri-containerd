@@ -85,7 +85,6 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 
 func TestGenerateSandboxContainerSpec(t *testing.T) {
 	testID := "test-id"
-	nsPath := "test-cni"
 	for desc, test := range map[string]struct {
 		configChange      func(*runtime.PodSandboxConfig)
 		podAnnotations    []string
@@ -99,7 +98,6 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				require.NotNil(t, spec.Linux)
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.NetworkNamespace,
-					Path: nsPath,
 				})
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.UTSNamespace,
@@ -119,6 +117,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 						Network: runtime.NamespaceMode_NODE,
 						Pid:     runtime.NamespaceMode_NODE,
 						Ipc:     runtime.NamespaceMode_NODE,
+						User:    runtime.NamespaceMode_NODE,
 					},
 				}
 			},
@@ -137,6 +136,44 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.IPCNamespace,
 				})
+				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.UserNamespace,
+				})
+			},
+		},
+		"user namespace": {
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						Network: runtime.NamespaceMode_POD,
+						Pid:     runtime.NamespaceMode_POD,
+						Ipc:     runtime.NamespaceMode_POD,
+						User:    runtime.NamespaceMode_POD,
+					},
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				// runtime spec should disable expected namespaces in host mode.
+				require.NotNil(t, spec.Linux)
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.NetworkNamespace,
+				})
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.UTSNamespace,
+				})
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.PIDNamespace,
+				})
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.IPCNamespace,
+				})
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.UserNamespace,
+				})
+				assert.Equal(t, len(spec.Linux.UIDMappings), 1)
+				assert.Equal(t, len(spec.Linux.GIDMappings), 1)
+				assert.NotEqual(t, spec.Linux.UIDMappings[0].HostID, 0)
+				assert.NotEqual(t, spec.Linux.GIDMappings[0].HostID, 0)
 			},
 		},
 		"should return error when entrypoint and cmd are empty": {
@@ -205,7 +242,7 @@ func TestGenerateSandboxContainerSpec(t *testing.T) {
 		if test.imageConfigChange != nil {
 			test.imageConfigChange(imageConfig)
 		}
-		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig, nsPath,
+		spec, err := c.generateSandboxContainerSpec(testID, config, imageConfig,
 			test.podAnnotations)
 		if test.expectErr {
 			assert.Error(t, err)
@@ -843,7 +880,7 @@ func TestSandboxDisableCgroup(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData()
 	c := newTestCRIService()
 	c.config.DisableCgroup = true
-	spec, err := c.generateSandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
+	spec, err := c.generateSandboxContainerSpec("test-id", config, imageConfig, []string{})
 	require.NoError(t, err)
 
 	t.Log("resource limit should not be set")

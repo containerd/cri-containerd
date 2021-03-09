@@ -151,6 +151,15 @@ type RegistryConfig struct {
 	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
+type LinuxIDMapping struct {
+	// container_id is the starting id for the mapping inside the container.
+	ContainerID uint32 `toml:"container_id" json:"containerID"`
+	// host_id is the starting id for the mapping on the host.
+	HostID uint32 `toml:"host_id" json:"hostID"`
+	// size is the length of the mapping.
+	Size uint32 `toml:"size" json:"size"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -204,6 +213,10 @@ type PluginConfig struct {
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
+	// NodeWideUIDMapping is the UID mapping to use when NamespaceOption.User = NOD
+	NodeWideUIDMapping LinuxIDMapping `toml:"node_wide_uid_mapping" json:"nodeWideUIDMapping"`
+	// NodeWideGIDMapping is the GID mapping to use when NamespaceOption.User = NODE
+	NodeWideGIDMapping LinuxIDMapping `toml:"node_wide_gid_mapping" json:"nodeWideGIDMapping"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -271,6 +284,8 @@ func DefaultConfig() PluginConfig {
 		},
 		MaxConcurrentDownloads: 3,
 		DisableProcMount:       false,
+		NodeWideUIDMapping:     LinuxIDMapping{0, 0, 4294967295},
+		NodeWideGIDMapping:     LinuxIDMapping{0, 0, 4294967295},
 	}
 }
 
@@ -358,6 +373,18 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return errors.Wrap(err, "invalid stream idle timeout")
 		}
+	}
+
+	// There should be a root in the container
+	if c.NodeWideUIDMapping.ContainerID != 0 || c.NodeWideGIDMapping.ContainerID != 0 {
+		return errors.New("missing root id in container")
+	}
+
+	// UID and GID mapping should be the same on containerd/cri 1.3.
+	// This can be revisited when oci.WithUserNamespace() gets support for different mappings.
+	// See https://github.com/containerd/containerd/commit/51a6813c06030ae2b3fcf9ec068e4b39cd2d1e69
+	if c.NodeWideUIDMapping != c.NodeWideGIDMapping {
+		return errors.New("different mappings for uid and gid not yet supported")
 	}
 	return nil
 }
